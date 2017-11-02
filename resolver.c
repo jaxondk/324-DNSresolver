@@ -20,6 +20,8 @@ typedef unsigned short dns_flags;
 //All sizes in bytes
 const int ID_SIZE = 2;
 const int HDR_SIZE = 12;
+const int MAX_WIRE_SIZE = 1024;
+char *PORT = "53"; //getaddrinfo needs port to be a char*
 
 typedef struct {
 	char *name;
@@ -326,14 +328,19 @@ int send_recv_message(unsigned char *request, int requestlen, unsigned char *res
     int clientfd = myopen_clientfd(server, port, SOCK_DGRAM); //connect to dns server on port 53. SOCK_DGRAM means UDP connection
     if(send(clientfd, request, requestlen, 0) < 0) //0 param just does no flags. this is equivalent to book's rio_writen call.
         printf("Send failed\n");
-    return recv(clientfd, response, 1024, 0);
+    return recv(clientfd, response, MAX_WIRE_SIZE, 0);
 }
 
 char *resolve(char *qname, char *server) {
     //build DNS query message
-    unsigned char wire[1024]; //picked a random size
-    int msg_length = create_dns_query(qname, wire);
-    print_bytes(wire, msg_length);
+    unsigned char msg[MAX_WIRE_SIZE];
+    int msg_length = create_dns_query(qname, msg);
+    //send message and receive response
+    unsigned char response[MAX_WIRE_SIZE];
+    int lengthResp = send_recv_message(msg, msg_length, response, server, PORT);
+    
+    printf("Size of response: %d\n",lengthResp);
+    print_bytes(response, lengthResp);
 }
 
 //make an open_myclientfd that adds an int type. then set ai_socktype in open_clientfd to SOCK_DGRAM
@@ -345,26 +352,7 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
     
-    unsigned char msg[] = {
-        0x27, 0xd6, 0x01, 0x00,
-        0x00, 0x01, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00,
-        0x03, 0x77, 0x77, 0x77,
-        0x07, 0x65, 0x78, 0x61,
-        0x6d, 0x70, 0x6c, 0x65,
-        0x03, 0x63, 0x6f, 0x6d,
-        0x00, 0x00, 0x01, 0x00,
-        0x01
-    };
-    
-    unsigned char response[1024];
-    int lengthResp = send_recv_message(msg, 33, response, argv[2], "53");
-    
-    printf("Size of response: %d\n",lengthResp);
-    print_bytes(response, lengthResp);
-    
-    
-//    ip = resolve(argv[1], argv[2]);
+    ip = resolve(argv[1], argv[2]);
 //    printf("%s => %s\n", argv[1], ip == NULL ? "NONE" : ip);
 }
 
