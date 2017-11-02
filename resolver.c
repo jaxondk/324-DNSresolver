@@ -150,22 +150,6 @@ void canonicalize_name(char *name) {
 	}
 }
 
-char *name_ascii_from_wire(unsigned char *wire, int *indexp) {
-	/* 
-	 * Extract the wire-formatted DNS name at the offset specified by
-	 * *indexp in the array of bytes provided (wire) and return its string
-	 * representation (dot-separated labels) in a char array allocated for
-	 * that purpose.  Update the value pointed to by indexp to the next
-	 * value beyond the name.
-	 *
-	 * INPUT:  wire: a pointer to an array of bytes
-	 * INPUT:  indexp, a pointer to the index in the wire where the
-	 *              wire-formatted name begins
-	 * OUTPUT: a string containing the string representation of the name,
-	 *              allocated on the heap.
-	 */
-}
-
 //dns_rr rr_from_wire(unsigned char *wire, int *indexp, int query_only) {
 //    /*
 //     * Extract the wire-formatted resource record at the offset specified by
@@ -267,6 +251,47 @@ int encode_name_to_wire(char *qname, unsigned char *wire) {
 }
 
 /*
+ * Extract the wire-formatted DNS name at the offset specified by
+ * *indexp in the array of bytes provided (wire) and return its string
+ * representation (dot-separated labels) in a char array allocated for
+ * that purpose.  Update the value pointed to by indexp to the next
+ * value beyond the name.
+ *
+ * INPUT:  wire: a pointer to an array of bytes
+ * INPUT:  indexp, the index in the wire where the wire-formatted name begins
+ * OUTPUT: a string containing the string representation of the name,
+ *              allocated on the heap.
+ */
+
+
+
+
+/*
+ * Gets the IP from the wire and decodes it into its string representation (decimal dot notation)
+ * For now, assumes that the last 4 bytes of the wire contain the IP address
+ * INPUT: wire: pointer to the array of bytes that have the response from DNS server
+ * INPUT: i: index into the wire where the IP address begins
+ * INPUT: length: length of the wire
+ * OUTPUT: the IP address in human readable form (Ex: 192.168.34.27)
+ */
+char *decode_ip_from_wire(unsigned char *wire, int i, int length) {
+    int ipNums[4];
+    //cout << mem[0] << " | dec: " << (int)(unsigned char)mem[0] << endl;
+    
+    int offset = i;
+    while(i != length)
+    {
+        ipNums[i-offset] = (int)wire[i];
+        //printf("ipNums[%d]: %d\n", i-offset, ipNums[i-offset]);
+        i++;
+    }
+    
+    char ip[16];
+    snprintf(ip, sizeof ip, "%d.%d.%d.%d", ipNums[0], ipNums[1], ipNums[2], ipNums[3]);
+    return ip;
+}
+
+/*
  * Creates question section of dns query
  * Starts at position HDR_SIZE on the wire. Puts encoding of qname on wire, followed by type and class fields
  * This should follow the encoding of qname:
@@ -275,7 +300,6 @@ int encode_name_to_wire(char *qname, unsigned char *wire) {
 int create_question(char *qname, unsigned char *wire)
 {
     int i = encode_name_to_wire(qname, wire);
-    print_bytes(wire, i);
     //add type and class to wire:
     wire[i] = 0; i++;
     wire[i] = 1; i++;
@@ -306,15 +330,22 @@ unsigned short create_dns_query(char *qname, unsigned char *wire) {
  *
  * INPUT:  qname: the string containing the name that was queried
  * INPUT:  wire: the pointer to the array of bytes representing the DNS wire message
+ * INPUT:  length: the length of the wire.
  * OUTPUT: a string representing the IP address in the answer; or NULL if none is found
  */
-char *get_answer_address(char *qname, unsigned char *wire) {
-	
-    
+char *get_answer_address(char *qname, unsigned char *wire, int length) {
     //-------------------------------------------------------------- YOU ARE HERE --------------------------------------------------------------
     //Gameplan: First just try and decode example.com's IP address. There are no aliases and no extra IPs, so this will be a simple case
     //          Once this is working, find out about what people are talking about for multiple IP's and aliases (CNAMEs), and implement that.
     //------------------------------------------------------------------------------------------------------------------------------------------
+    
+    
+    //Note - Only works if exactly one IP address found.
+    //Doesn't work if no address found or for things like www.intel.com
+    //Also, for multiple IP's found, it returns the wrong one (supposed to return first, but this returns last
+    int i = length - 4; //if an IP address exists, this will not point to the first part of it
+    
+    return decode_ip_from_wire(wire, i, length);
 }
 
 /*
@@ -343,9 +374,11 @@ char *resolve(char *qname, char *server) {
     //send message and receive response
     unsigned char response[MAX_WIRE_SIZE];
     int lengthResp = send_recv_message(msg, msg_length, response, server, PORT);
+//    printf("Size of response: %d\n",lengthResp);
+//    print_bytes(response, lengthResp);
     
-    printf("Size of response: %d\n",lengthResp);
-    print_bytes(response, lengthResp);
+    //extract IP address from response
+    return get_answer_address(qname, response, lengthResp);
 }
 
 //make an open_myclientfd that adds an int type. then set ai_socktype in open_clientfd to SOCK_DGRAM
@@ -358,7 +391,7 @@ int main(int argc, char *argv[]) {
 	}
     
     ip = resolve(argv[1], argv[2]);
-//    printf("%s => %s\n", argv[1], ip == NULL ? "NONE" : ip);
+    printf("%s => %s\n", argv[1], ip == NULL ? "NONE" : ip);
 }
 
 
