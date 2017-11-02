@@ -4,7 +4,10 @@
 #include<sys/types.h>
 #include<sys/socket.h>
 #include<netinet/in.h>
-#include "csapp.h"
+#include <netdb.h>
+#include <errno.h>
+#include <unistd.h>
+#include <time.h>
 
 typedef unsigned int dns_rr_ttl;
 typedef unsigned short dns_rr_type;
@@ -26,6 +29,52 @@ typedef struct {
 	dns_rdata_len rdata_len;
 	unsigned char *rdata;
 } dns_rr;
+
+/*
+ * myopen_clientfd - Open connection with socket type <socktype> to server at <hostname, port> and
+ *     return a socket descriptor ready for reading and writing. This
+ *     function is reentrant and protocol-independent. use SOCK_DRAM as <socktype> for UDP connections
+ *
+ *     On error, returns:
+ *       -2 for getaddrinfo error
+ *       -1 with errno set for other errors.
+ */
+int myopen_clientfd(char *hostname, char *port, int socktype) {
+    int clientfd, rc;
+    struct addrinfo hints, *listp, *p;
+    
+    /* Get a list of potential server addresses */
+    memset(&hints, 0, sizeof(struct addrinfo));
+    hints.ai_socktype = socktype;  /* Open a connection */
+    hints.ai_flags = AI_NUMERICSERV;  /* ... using a numeric port arg. */
+    hints.ai_flags |= AI_ADDRCONFIG;  /* Recommended for connections */
+    if ((rc = getaddrinfo(hostname, port, &hints, &listp)) != 0) {
+        fprintf(stderr, "getaddrinfo failed (%s:%s): %s\n", hostname, port, gai_strerror(rc));
+        return -2;
+    }
+    
+    /* Walk the list for one that we can successfully connect to */
+    for (p = listp; p; p = p->ai_next) {
+        /* Create a socket descriptor */
+        if ((clientfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) < 0)
+            continue; /* Socket failed, try the next */
+        
+        /* Connect to the server */
+        if (connect(clientfd, p->ai_addr, p->ai_addrlen) != -1)
+            break; /* Success */
+        if (close(clientfd) < 0) { /* Connect failed, try another */  //line:netp:openclientfd:closefd
+            fprintf(stderr, "open_clientfd: close failed: %s\n", strerror(errno));
+            return -1;
+        }
+    }
+    
+    /* Clean up */
+    freeaddrinfo(listp);
+    if (!p) /* All connects failed */
+        return -1;
+    else    /* The last connect succeeded */
+        return clientfd;
+}
 
 void print_bytes(unsigned char *bytes, int byteslen) {
 	int i, j, byteslen_adjusted;
@@ -261,19 +310,23 @@ char *get_answer_address(char *qname, dns_rr_type qtype, unsigned char *wire) {
 	 */
 }
 
-int send_recv_message(unsigned char *request, int requestlen, unsigned char *response, char *server, unsigned short port) {
-	/* 
-	 * Send a message (request) over UDP to a server (server) and port
-	 * (port) and wait for a response, which is placed in another byte
-	 * array (response).  Create a socket, "connect()" it to the
-	 * appropriate destination, and then use send() and recv();
-	 *
-	 * INPUT:  request: a pointer to an array of bytes that should be sent
-	 * INPUT:  requestlen: the length of request, in bytes.
-	 * INPUT:  response: a pointer to an array of bytes in which the
-	 *             response should be received
-	 * OUTPUT: the size (bytes) of the response received
-	 */
+/*
+ * Send a message (request) over UDP to a server (server) and port
+ * (port) and wait for a response, which is placed in another byte
+ * array (response).  Create a socket, "connect()" it to the
+ * appropriate destination, and then use send() and recv();
+ *
+ * INPUT:  request: a pointer to an array of bytes that should be sent
+ * INPUT:  requestlen: the length of request, in bytes.
+ * INPUT:  response: a pointer to an array of bytes in which the
+ *             response should be received
+ * OUTPUT: the size (bytes) of the response received
+ */
+int send_recv_message(unsigned char *request, int requestlen, unsigned char *response, char *server, char *port) {
+    int clientfd = myopen_clientfd(server, port, SOCK_DGRAM); //connect to dns server on port 53. SOCK_DGRAM means UDP connection
+    if(send(clientfd, request, requestlen, 0) < 0) //0 param just does no flags. this is equivalent to book's rio_writen call.
+        printf("Send failed\n");
+    return recv(clientfd, response, 1024, 0);
 }
 
 char *resolve(char *qname, char *server) {
@@ -283,17 +336,39 @@ char *resolve(char *qname, char *server) {
     print_bytes(wire, msg_length);
 }
 
-//make an open_myclientfd that adds an int type. then set ai_socktype in open_clientfd to SOCKDGRAM
+//make an open_myclientfd that adds an int type. then set ai_socktype in open_clientfd to SOCK_DGRAM
 int main(int argc, char *argv[]) {
-	char *ip;
-    printf("%lu", sizeof(unsigned char));
+	srand(time(NULL)); //for generating random id
+    char *ip;
 	if (argc < 3) {
 		fprintf(stderr, "Usage: %s <domain name> <server>\n", argv[0]);
 		exit(1);
 	}
     
-    srand(time(NULL)); //for generating random id
+    unsigned char msg[] = {
+        0x27, 0xd6, 0x01, 0x00,
+        0x00, 0x01, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00,
+        0x03, 0x77, 0x77, 0x77,
+        0x07, 0x65, 0x78, 0x61,
+        0x6d, 0x70, 0x6c, 0x65,
+        0x03, 0x63, 0x6f, 0x6d,
+        0x00, 0x00, 0x01, 0x00,
+        0x01
+    };
     
-	ip = resolve(argv[1], argv[2]);
-	//printf("%s => %s\n", argv[1], ip == NULL ? "NONE" : ip);
+    unsigned char response[1024];
+    int lengthResp = send_recv_message(msg, 33, response, argv[2], "53");
+    
+    printf("Size of response: %d\n",lengthResp);
+    print_bytes(response, lengthResp);
+    
+    
+//    ip = resolve(argv[1], argv[2]);
+//    printf("%s => %s\n", argv[1], ip == NULL ? "NONE" : ip);
 }
+
+
+
+
+
