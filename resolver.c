@@ -23,14 +23,14 @@ const int HDR_SIZE = 12;
 const int MAX_WIRE_SIZE = 1024;
 char *PORT = "53"; //getaddrinfo needs port to be a char*
 
-typedef struct {
-	char *name;
-	dns_rr_type type;
-	dns_rr_class class;
-	dns_rr_ttl ttl;
-	dns_rdata_len rdata_len;
-	unsigned char *rdata;
-} dns_rr;
+//typedef struct {
+//    char *name;
+//    dns_rr_type type;
+//    dns_rr_class class;
+//    dns_rr_ttl ttl;
+//    dns_rdata_len rdata_len;
+//    unsigned char *rdata;
+//} dns_rr;
 
 /*
  * myopen_clientfd - Open connection with socket type <socktype> to server at <hostname, port> and
@@ -166,24 +166,24 @@ char *name_ascii_from_wire(unsigned char *wire, int *indexp) {
 	 */
 }
 
-dns_rr rr_from_wire(unsigned char *wire, int *indexp, int query_only) {
-	/* 
-	 * Extract the wire-formatted resource record at the offset specified by
-	 * *indexp in the array of bytes provided (wire) and return a 
-	 * dns_rr (struct) populated with its contents. Update the value
-	 * pointed to by indexp to the next value beyond the resource record.
-	 *
-	 * INPUT:  wire: a pointer to an array of bytes
-	 * INPUT:  indexp: a pointer to the index in the wire where the
-	 *              wire-formatted resource record begins
-	 * INPUT:  query_only: a boolean value (1 or 0) which indicates whether
-	 *              we are extracting a full resource record or only a
-	 *              query (i.e., in the question section of the DNS
-	 *              message).  In the case of the latter, the ttl,
-	 *              rdata_len, and rdata are skipped.
-	 * OUTPUT: the resource record (struct)
-	 */
-}
+//dns_rr rr_from_wire(unsigned char *wire, int *indexp, int query_only) {
+//    /*
+//     * Extract the wire-formatted resource record at the offset specified by
+//     * *indexp in the array of bytes provided (wire) and return a
+//     * dns_rr (struct) populated with its contents. Update the value
+//     * pointed to by indexp to the next value beyond the resource record.
+//     *
+//     * INPUT:  wire: a pointer to an array of bytes
+//     * INPUT:  indexp: a pointer to the index in the wire where the
+//     *              wire-formatted resource record begins
+//     * INPUT:  query_only: a boolean value (1 or 0) which indicates whether
+//     *              we are extracting a full resource record or only a
+//     *              query (i.e., in the question section of the DNS
+//     *              message).  In the case of the latter, the ttl,
+//     *              rdata_len, and rdata are skipped.
+//     * OUTPUT: the resource record (struct)
+//     */
+//}
 
 
 //int rr_to_wire(dns_rr rr, unsigned char *wire, int query_only) {
@@ -299,17 +299,22 @@ unsigned short create_dns_query(char *qname, unsigned char *wire) {
     return create_question(qname, wire);
 }
 
-char *get_answer_address(char *qname, dns_rr_type qtype, unsigned char *wire) {
-	/* 
-	 * Extract the IPv4 address from the answer section, following any
-	 * aliases that might be found, and return the string representation of
-	 * the IP address.  If no address is found, then return NULL.
-	 *
-	 * INPUT:  qname: the string containing the name that was queried
-	 * INPUT:  qtype: the integer representation of type of the query (type A == 1)
-	 * INPUT:  wire: the pointer to the array of bytes representing the DNS wire message
-	 * OUTPUT: a string representing the IP address in the answer; or NULL if none is found
-	 */
+/*
+ * Extract the IPv4 address from the answer section, following any
+ * aliases that might be found, and return the string representation of
+ * the IP address.  If no address is found, then return NULL.
+ *
+ * INPUT:  qname: the string containing the name that was queried
+ * INPUT:  wire: the pointer to the array of bytes representing the DNS wire message
+ * OUTPUT: a string representing the IP address in the answer; or NULL if none is found
+ */
+char *get_answer_address(char *qname, unsigned char *wire) {
+	
+    
+    //-------------------------------------------------------------- YOU ARE HERE --------------------------------------------------------------
+    //Gameplan: First just try and decode example.com's IP address. There are no aliases and no extra IPs, so this will be a simple case
+    //          Once this is working, find out about what people are talking about for multiple IP's and aliases (CNAMEs), and implement that.
+    //------------------------------------------------------------------------------------------------------------------------------------------
 }
 
 /*
